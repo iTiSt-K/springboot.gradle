@@ -1,0 +1,15 @@
+### Spring Properties
+spring:
+  # config:
+  #   import:
+  #   - classpath:datasource.yml
+  #   - classpath:petraDB.yml
+  #   - classpath:yb-security.yml
+  #   - classpath:yb-properties.yml
+  # profiles:
+  #   active: dev
+  application:
+    name: unified-core-api
+
+### Test Properties
+test: common

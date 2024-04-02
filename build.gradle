@@ -13,7 +13,7 @@ java {
 
 configurations {
 	compileOnly {
-		extendsFrom annotationProcessor
+		extendsFrom annotationProcessor		// Lombok 을 위한 관련 설정.
 	}
 }
 
@@ -31,4 +31,72 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// 프로필 설정
+println(">>> ${project.hasProperty('profile')}")
+ext {
+	activeProfile = (!project.hasProperty('profile') || !profile) ? 'local' : profile
+    profiles = [
+            local: 'Local',
+            test: 'Feature-Test',
+            dev: 'Development',
+            stg: 'Stage',
+            prod: 'Product-Release'
+    ]
+}
+// def activeProfile = (!project.hasProperty('profile') || !profile) ? 'local' : profile // 기본적으로 활성화할 프로필
+def activeEnvironment = profiles[activeProfile]
+logger.info(">>> ${activeProfile} : ${activeEnvironment}")
+
+// 환경 설정 : 리소스 디렉토리 추가
+sourceSets {
+    main {
+        resources {
+			srcDirs "src/main/resources-env/${activeProfile}"
+        }
+    }
+}
+task addProperties {
+    doLast {
+        logger.info(">>> Propertie[spring.profiles.active] : ${activeProfile}")
+        def propertiesFile = file('src/main/resources/application.properties')
+        propertiesFile << 'spring.profiles.active=' + activeProfile
+    }
+}
+build.dependsOn(addProperties)
+// println(">>> ${activeEnvironment} : src/main/resources-${activeProfile}")
+// logger.quiet("This is a quiet log message")
+// logger.warn("This is a warning message")
+// logger.error("This is an error message")
+// logger.debug("This is an debug message")
+// logger.trace("This is an trace message")
+// 리소스 설정
+// processResources {
+//     // 리소스 디렉토리
+//     def resourceDir = "src/main/resources/profiles/${activeProfile}"
+//     // 필터링
+//     filter org.apache.tools.ant.filters.ReplaceTokens, tokens: [
+//             'spring.profiles.active': activeProfile,
+//             'environment': activeEnvironment
+//     ]
+//     // 리소스 디렉토리 추가
+//     from resourceDir
+//     // Maven과 달리 Gradle에서는 exclude 설정이 필요 없음
+// }
+
+// Build 설정 - Spring Boot 애플리케이션을 실행하는 데 필요한 모든 것을 포함하는 단일 Jar 파일을 생성
+bootJar {
+    // 자원 설정
+    // resources {
+    //     // Java 폴더 아래의 sql mapper XML 파일을 포함
+    //     srcDirs = ['src/main/java']
+    //     includes = ['**/*.xml']
+    // }
+
+    // 최종 파일명 설정
+	// archiveFileName = "${project.archivesBaseName}-${version}.jar"
+    archiveFileName = "${project.archivesBaseName}.jar"
+	// def buildVersion = version + ".b" + project.buildVersion // 빌드 버전 설정
+    // archiveFileName = "${project.archivesBaseName}-${buildVersion}.jar" // 빌드 버전을 포함한 JAR 파일 이름 설정
 }

@@ -1,0 +1,18 @@
+# https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.spring-application.banner
+# https://patorjk.com/software/taag/#p=display&f=Soft&t=Unified%20Core%20API%0A-%20stage
+
+                                                                                                         
+,--. ,--.        ,--. ,---.,--.          ,--.     ,-----.                           ,---.  ,------. ,--. 
+|  | |  |,--,--, `--'/  .-'`--' ,---.  ,-|  |    '  .--./ ,---. ,--.--. ,---.      /  O  \ |  .--. '|  | 
+|  | |  ||      \,--.|  `-,,--.| .-. :' .-. |    |  |    | .-. ||  .--'| .-. :    |  .-.  ||  '--' ||  | 
+'  '-'  '|  ||  ||  ||  .-'|  |\   --.\ `-' |    '  '--'\' '-' '|  |   \   --.    |  | |  ||  | --' |  | 
+ `-----' `--''--'`--'`--'  `--' `----' `---'      `-----' `---' `--'    `----'    `--' `--'`--'     `--' 
+                   ,--.                                                                                  
+,-----.     ,---.,-'  '-. ,--,--. ,---.  ,---.                                                           
+'-----'    (  .-''-.  .-'' ,-.  || .-. || .-. :                                                          
+           .-'  `) |  |  \ '-'  |' '-' '\   --.                                                          
+           `----'  `--'   `--`--'.`-  /  `----'                                                          
+                                 `---'                                                                   
+
+${AnsiColor.YELLOW}${project.name} ${AnsiColor.DEFAULT}:: ${AnsiColor.BRIGHT_CYAN}${environment.code} ${AnsiColor.DEFAULT}(${project.version})
+Powered by Spring Boot ${spring-boot.formatted-version}
