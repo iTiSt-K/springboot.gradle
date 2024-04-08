@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 60초마다 설정 파일의 변경을 확인 하여 변경시 갱신 -->
+<configuration scan="true" scanPeriod="60 seconds">
+	<conversionRule conversionWord="replaceThread" converterClass="ch.qos.logback.classic.pattern.ReplaceConverter" />
+
+	<!--Environment 내의 프로퍼티들을 개별적으로 설정할 수도 있다. -->
+	<springProperty scope="context" name="ACTIVE_PROFILE" source="spring.profiles.active"/>
+	<springProperty scope="context" name="LOG_LEVEL_ROOT" source="logging.level.root" />
+	<springProperty scope="context" name="LOG_LEVEL_BIZ" source="logging.level.biz" />
+	<springProperty scope="context" name="LOG_PATH" source="log.path" />
+	<springProperty scope="context" name="PREFIX_FILE_NAME" source="log.filename" />
+	<springProperty scope="context" name="SERVICE_PACKAGE" source="yb.project.code" />
+	
+	<!-- log file path -->
+	<!-- <property name="LOG_PATH" value="${log.path}" /> -->
+	<!-- log file name -->
+	<!-- <property name="PREFIX_FILE_NAME" value="${log.filename}" /> -->
+	<property name="LOG_FILE_NAME" value="${PREFIX_FILE_NAME}-log" />
+	<property name="LOG_JSON_NAME" value="${PREFIX_FILE_NAME}-json" />
+	<property name="ERR_LOG_FILE_NAME" value="${PREFIX_FILE_NAME}-err" />
+
+	<!-- pattern -->
+	<property name="LOG_PATTERN_CONSOLE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%5level) %boldCyan(%50logger{50}:%-4line) : %msg%n" />
+	<!-- <property name="LOG_PATTERN_CONSOLE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-25([${PID:-}:%thread]) %highlight(%5level) %boldCyan(%50logger{50}:%-4line) : %msg%n" /> -->
+	<property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [PID:${PID:-} Thrd:%thread] %logger:%line - %M%n%23level > %msg%n" />
+	<property name="LOG_PATTERN_LOKI_LOGFMT" value="pid=${PID:-} thrd=%replace(%thread){'\s', '_'} logger=%logger class=%logger{0} method=%method line=%line msg=%msg ex=%exception" />
+	<!-- <property name="LOG_PATTERN_LOKI_JSON" value="" /> -->
+
+	<!-- Console Appender -->
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder class="net.logstash.logback.encoder.LogstashEncoder">
+			<fieldNames>
+				<timestamp>timestamp</timestamp>
+				<thread>[ignore]</thread>
+				<version>[ignore]</version>
+				<stackTrace>exception</stackTrace>
+			</fieldNames>
+			<includeContext>true</includeContext>
+            <includeCallerData>true</includeCallerData>
+            <!-- 아름아운 로그를 출력하기 위해서 -->
+            <!-- <jsonGeneratorDecorator class="net.logstash.logback.decorate.CompositeJsonGeneratorDecorator">
+                <decorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+            </jsonGeneratorDecorator> -->
+			<customFields>{"profile":"${ACTIVE_PROFILE}"}</customFields>
+		</encoder>
+	</appender>
+	<!-- <springProfile name="local"> -->
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${LOG_PATTERN_CONSOLE}</pattern>
+		</encoder>
+	</appender>
+	<!-- </springProfile> -->
+
+	<!-- Grafana Loki Appender -->
+	<appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+		<!-- general settings -->
+		<!-- <metricsEnabled>true</metricsEnabled> -->
+		<http><!-- HTTP settings -->
+			<url>http://172.16.60.43:3100/loki/api/v1/push</url>
+		</http>
+		<format><!-- format settings -->
+			<label>
+				<pattern>app=${SERVICE_PACKAGE},env=${ACTIVE_PROFILE},host=${HOSTNAME},level=%level</pattern>
+			</label>
+			<message>
+				<!-- Logfmt -->
+				<!-- <pattern>${LOG_PATTERN_LOKI_LOGFMT}</pattern> -->
+				<!-- JSON -->
+				<pattern>{"pid":"${PID}","logger":"%logger","thread":"%thread","class":"%logger{0}","method":"%method","line":"%line","message":"%replace(%message){'"(.*?)"','\\"$1\\"'}","exception":"%exception","mdc":"%mdc"}</pattern>
+			</message>
+			<sortByTime>true</sortByTime>
+		</format>
+	</appender>
+
+	<!-- File Appender -->
+	<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<!-- 파일경로 설정 -->
+		<file>${LOG_PATH}/${LOG_FILE_NAME}.log</file>
+		<!-- 출력패턴 설정 -->
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${LOG_PATTERN_FILE}</pattern>
+		</encoder>
+		<!-- Rolling 정책 -->
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<!-- .gz,.zip 등을 넣으면 자동 일자별 로그파일 압축 -->
+			<fileNamePattern>${LOG_PATH}/${LOG_FILE_NAME}.%d{yyyy-MM-dd_HH}_%i.log</fileNamePattern>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<!-- 파일당 최고 용량 KB, MB, GB -->
+				<maxFileSize>5MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+			<!-- 일자별 로그파일 최대 보관주기(~일), 해당 설정일 이상된 파일은 자동으로 제거 -->
+			<maxHistory>90</maxHistory>
+			<!--<MinIndex>1</MinIndex> <MaxIndex>10</MaxIndex> -->
+		</rollingPolicy>
+	</appender>
+
+	<!-- File Appender : Only Error -->
+	<appender name="ERR-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>error</level>
+			<onMatch>ACCEPT</onMatch>	<!-- 해당 레벨만 기록한다. -->
+			<onMismatch>DENY</onMismatch>	<!-- 다른 수준의 레벨은 기록하지 않는다.(상위 레벨도 기록 안함), 상위 수준의 레벨에 대한 기록을 원하면 ACCEPT 로 하면 기록된다. -->
+		</filter>
+		<!-- 파일경로 설정 -->
+		<file>${LOG_PATH}/${ERR_LOG_FILE_NAME}.log</file>
+		<!-- 출력패턴 설정 -->
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${LOG_PATTERN_FILE}</pattern>
+		</encoder>
+		<!-- Rolling 정책 -->
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<!-- .gz,.zip 등을 넣으면 자동 일자별 로그파일 압축 -->
+			<fileNamePattern>${LOG_PATH}/${ERR_LOG_FILE_NAME}.%d{yyyy-MM-dd}_%i.log</fileNamePattern>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<!-- 파일당 최고 용량 kb, mb, gb -->
+				<maxFileSize>10MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+			<!-- 일자별 로그파일 최대 보관주기(~일), 해당 설정일 이상된 파일은 자동으로 제거 -->
+			<maxHistory>180</maxHistory>
+		</rollingPolicy>
+	</appender>
+
+	<!-- Logstash JSON File Appender -->
+	<appender name="LogstashJsonFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<!-- 파일경로 설정 -->
+		<file>${LOG_PATH}/${LOG_JSON_NAME}.log</file>
+		<!-- 출력패턴 설정 -->
+		<encoder class="net.logstash.logback.encoder.LogstashEncoder">
+			<fieldNames>
+				<timestamp>timestamp</timestamp>
+				<thread>[ignore]</thread>
+				<version>[ignore]</version>
+				<stackTrace>exception</stackTrace>
+			</fieldNames>
+			<includeContext>true</includeContext>
+            <includeCallerData>true</includeCallerData>
+            <!-- 아름아운 로그를 출력하기 위해서 -->
+            <!-- <jsonGeneratorDecorator class="net.logstash.logback.decorate.CompositeJsonGeneratorDecorator">
+                <decorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+            </jsonGeneratorDecorator> -->
+			<timestampPattern>yyyy-MM-dd HH:mm:ss.SSS</timestampPattern>
+			<customFields>{"profile":"${ACTIVE_PROFILE}"}</customFields>
+		</encoder>
+		<encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+			<providers>
+                <timestamp></timestamp>
+                <pattern>
+                    <pattern>
+                        {
+                        "severity": "%level",
+                        "service": "${springAppName:-}",
+                        "traceId": "%X{traceId:-}",
+                        "spanId": "%X{spanId:-}",
+                        "parentSpanId": "%X{parentSpanId:-}",
+                        "pid": "${PID:-}",
+                        "thread": "%thread",
+                        "class": "%logger{40}",
+                        "message": "#tryJson{%message %exception{5,20,1024,rootFirst}}"
+                        }
+                    </pattern>
+                    <omitEmptyFields>true</omitEmptyFields>
+                </pattern>
+            </providers>
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <value>\"(\w*(?i)card\w*)\"\s*:\s*\"([^\"]*)\"</value><!-- Any property with the word card -->
+                <value>\"(\w*(?i)address\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)email\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)password\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)token\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)phone\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)passport\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)expiryDate\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)security\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)txnFlow\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)cvc\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)firstName\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>\"(\w*(?i)lastName\w*)\"\s*:\s*\"([^\"]*)\"</value>
+                <value>(\d+\.\d+\.\d+\.\d+)</value> <!-- Ip address IPv4-->
+                <value>(\w+@\w+\.\w+)</value> <!-- Email pattern -->
+            </jsonGeneratorDecorator>
+      </encoder>
+		<!-- Rolling 정책 -->
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<!-- daily rollover -->
+			<fileNamePattern>${LOG_PATH}/${LOG_JSON_NAME}.%d{yyyy-MM-dd}_%i.gz</fileNamePattern>
+			<!-- keep 30 days' worth of history capped at 3GB total size -->
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>3GB</totalSizeCap>
+		</rollingPolicy>
+
+		<triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+			<maxFileSize>3GB</maxFileSize>
+		</triggeringPolicy>
+	</appender>
+
+	<!-- root레벨 설정 : TRACE > DEBUG > INFO > WARN > ERROR -->
+	<root level="${LOG_LEVEL_ROOT}">
+		<appender-ref ref="CONSOLE" />
+	</root>
+
+	<!-- 패키지별 로깅레벨 설정 -->
+	<!-- 
+	<logger name="org.apache.ibatis" level="${LOG_LEVEL_ROOT}" additivity="false">
+		<appender-ref ref="CONSOLE" />
+	</logger>
+
+	<logger name="com.yellowballoon.framework.spring.boot" level="${LOG_LEVEL_ROOT}" additivity="false">
+		<appender-ref ref="CONSOLE" />
+		<appender-ref ref="FILE" />
+		<appender-ref ref="LOKI" />
+	</logger>
+	 -->
+
+	<logger name="com.yellowballoon.essential" level="${LOG_LEVEL_BIZ}" additivity="false"><!-- additivity="false" : 상위 로거로 전달 방지 -->
+		<appender-ref ref="CONSOLE" />
+		<appender-ref ref="FILE" />
+	</logger>
+
+	<!-- 
+	<logger name="com.yellowballoon.essential.api.common" level="${LOG_LEVEL_ROOT}" additivity="false">
+		<appender-ref ref="CONSOLE" />
+		<appender-ref ref="FILE" />
+		<appender-ref ref="LOKI" />
+	</logger>
+	 -->
+
+	<!-- 환경에 따른 로깅레벨 설정 -->
+	<springProfile name="local">
+		<!-- 
+		<logger name="org.springframework.web.filter" level="debug" additivity="false">
+			<appender-ref ref="CONSOLE" />
+		</logger>
+		 -->
+	</springProfile>
+	<springProfile name="!local">
+		<root>
+			<appender-ref ref="FILE" />
+			<appender-ref ref="LOKI" />
+			<!-- <appender-ref ref="LogstashJsonFile" /> -->
+		</root>
+
+		<logger name="com.yellowballoon.essential">
+			<appender-ref ref="LOKI" />
+		</logger>
+	</springProfile>
+	<springProfile name="prod">
+		<root>
+			<appender-ref ref="ERR-FILE" />
+		</root>
+
+		<!-- 
+		<logger name="org.springframework.web.filter" level="debug" additivity="false">
+			<appender-ref ref="CONSOLE" />
+			<appender-ref ref="LOKI" />
+		</logger>
+		 -->
+
+		<logger name="com.yellowballoon.essential">
+			<appender-ref ref="ERR-FILE" />
+		</logger>
+	</springProfile>
+</configuration>
